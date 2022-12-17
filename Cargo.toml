@@ -1,0 +1,10 @@
+[package]
+name = "cow-vec"
+version = "0.1.0"
+description = "CowVec is a vector whose elements are clone-on-write."
+authors = ["Keith T. Star <uberfoo@me.com>"]
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
