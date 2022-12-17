@@ -22,6 +22,8 @@ use core::{
     ops::{Deref, DerefMut},
 };
 
+use log::error;
+
 /// A vector with CoW elements
 ///
 #[derive(Debug)]
@@ -118,7 +120,9 @@ where
         self.len += 1;
     }
 
-    // TODO: Double check this lifetime on self. It works, but is it right?
+    /// Return an iterator over the collection
+    ///
+    /// TODO: Double check this lifetime on self. It works, but is it right?
     pub fn iter(&'a self) -> Iter<'a, T> {
         Iter {
             index: 0,
@@ -126,6 +130,8 @@ where
         }
     }
 
+    /// Return a mutable iterator over the collection
+    ///
     pub fn iter_mut(&'a mut self) -> IterMut<'a, T> {
         IterMut {
             index: 0,
@@ -133,12 +139,31 @@ where
         }
     }
 
+    /// Test if the indicated item is owned or borrowed.
+    ///
     pub fn is_owned(&self, index: usize) -> Option<bool> {
         if let Some(cow) = self.get_cow(index) {
             Some(cow.is_owned())
         } else {
             None
         }
+    }
+
+    /// Return a `Vec<bool>` indicating owned or borrowed.
+    ///
+    /// For each element in the returned vector, a bool is returned. If the value
+    /// is false, the element is borrowed. If true, it is owned.
+    pub fn get_owned(&self) -> Vec<bool> {
+        let mut result = Vec::with_capacity(self.capacity());
+
+        for i in 0..self.len() {
+            match self.is_owned(i) {
+                Some(owned) => result.push(owned),
+                None => error!("Unexpected result calling self.is_owned() in get_owned()"),
+            }
+        }
+
+        result
     }
 }
 
@@ -166,7 +191,7 @@ where
         // We don't know where the extra capacity goes, so we start over with
         // a new `Vec`.
         let mut new = Vec::with_capacity(new_capacity);
-        // Safety: we are copying self.len items to a fresh budder. self.len
+        // Safety: we are copying self.len items to a fresh buffer. self.len
         // is properly maintained.
         unsafe {
             core::ptr::copy_nonoverlapping(self.storage.as_ptr(), new.as_mut_ptr(), self.len);
@@ -532,6 +557,12 @@ mod tests {
         assert!(!cow.is_owned(0).unwrap());
         assert!(!cow.is_owned(1).unwrap());
         assert!(cow.is_owned(2).unwrap());
+
+        // Throw in a get_owned test
+        let owned = cow.get_owned();
+        assert!(!owned[0]);
+        assert!(!owned[1]);
+        assert!(owned[2])
     }
 
     #[test]
@@ -550,23 +581,36 @@ mod tests {
         let v = vec![Foo(42), Foo(27)];
         let mut cow = CowVec::new(&v);
 
-        let ci: Vec<&mut Foo> = cow
-            .iter_mut()
-            .map(|e| {
-                e.0 += 10;
-                e
-            })
-            .collect();
+        // Throw in a get_owned test
+        let owned = cow.get_owned();
+        assert!(!owned[0]);
+        assert!(!owned[1]);
 
-        let mut v1 = v.clone();
-        let vi: Vec<&mut Foo> = v1
-            .iter_mut()
-            .map(|e| {
-                e.0 += 10;
-                e
-            })
-            .collect();
-        assert_eq!(ci, vi);
+        {
+            let ci: Vec<&mut Foo> = cow
+                .iter_mut()
+                .map(|e| {
+                    e.0 += 10;
+                    e
+                })
+                .collect();
+
+            let mut v1 = v.clone();
+            let vi: Vec<&mut Foo> = v1
+                .iter_mut()
+                .map(|e| {
+                    e.0 += 10;
+                    e
+                })
+                .collect();
+            assert_eq!(ci, vi);
+        }
+
+        //  There's something going on with NLL, and I'd like to fix it if I can.
+        // Throw in a get_owned test
+        // let owned = cow.get_owned();
+        // assert!(owned[0]);
+        // assert!(owned[1]);
     }
 
     #[test]
