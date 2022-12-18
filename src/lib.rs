@@ -398,9 +398,12 @@ mod tests {
         bar.0 = 27;
 
         // the original reference is intact, and our cow has a new value
-        assert_eq!(*bar, Foo(27));
-        assert_eq!(answer, Foo(42));
-        assert!(bar.is_owned());
+        // note especially that `foo` is still a reference to the original
+        // value
+        assert_eq!(*foo, Foo(42)); // <--- original reference
+        assert_eq!(*bar, Foo(27)); // <--- mutable reference to above
+        assert_eq!(answer, Foo(42)); // <--- original owned Foo
+        assert!(bar.is_owned()); // <--- cloned Fooo
     }
 
     #[test]
